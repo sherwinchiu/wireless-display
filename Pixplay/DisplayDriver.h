@@ -19,10 +19,13 @@ int16_t ypos = 0;
 
 void setupTFT(){
   Serial.println(F("Hello! ST77xx TFT Test"));
+  
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
 
   tft.init(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);           // Init ST7789 320x240
+  
   tft.fillScreen(ST77XX_BLACK);
+  
 }
 

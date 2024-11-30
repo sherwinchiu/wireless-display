@@ -39,6 +39,7 @@ AsyncWebServer server(80);
 
 void setup() {
   Serial.begin(115200);
+  setupTFT();
   preferences.begin("creds", false);
   // check in cache for ssid and apss
   wifi_ssid = preferences.getString(PARAM_WIFI_SSID, "DEFAULT");
@@ -53,7 +54,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) { // Check WiFi status every 500ms. If after 7.5 attempts, no connection 
     delay(500);
     Serial.print(".");
-    if (millis() - currTime > 15000) { // Start WiFi in access point mode.
+    if (millis() - currTime > 20000) { // Start WiFi in access point mode.
       // If it doesn't exist, run server in access point mode. Wait until "submit" button is pressed and valid
       // credentials is put in. Attempt to connect, if connection isn't possible keep waiting.
       Serial.println("\nNo WiFi connection could be made. Started AP Mode. Please connect to PixPlay on your phone.");
@@ -93,12 +94,6 @@ void setup() {
   // If connection is unsucessful, skip to next step.
   Serial.println();
   Serial.println("I'm connected to WiFi!");
-
-  // Display code & Fetch Image
-  // Setup TFT
-  setupTFT();
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  //
 }
 
 void loop() {
@@ -110,14 +105,17 @@ void loop() {
     size_t contentLength = http.getSize();
 
     // Buffer for one line of pixels (240 pixels × 2 bytes per pixel)
-    const size_t lineWidth = 240 * 3; // 480 bytes
+    // const size_t lineStride = ((240 * 3 + 3) & ~3);
+    int padding = (4 - (240 * 3) % 4) % 4;
+    const size_t lineWidth = 240 * 3 + padding; // 480 bytes
+    uint8_t bmpLine[lineWidth];
     uint16_t lineBuffer[240];
 
     size_t bytesRead = 0;
     size_t totalBytesRead = 0;
     int y = 0;
     size_t skippedBytes = 0;
-    size_t headerBytes = 56;
+    size_t headerBytes = 54;
     while (skippedBytes < headerBytes) {
         stream->read();  // Read and discard one byte at a time
         skippedBytes++;
@@ -126,16 +124,24 @@ void loop() {
 
     // Read the image data line by line
     while (totalBytesRead < contentLength && y < 320) {
+        // memset(lineBuffer, 0, sizeof(lineBuffer));
         // Read one line of data
-        bytesRead = stream->readBytes((char*)lineBuffer, lineWidth);
+        bytesRead = stream->readBytes((char*)bmpLine, lineWidth);
 
         if (bytesRead > 0) {
             // Ensure that we read the full line (if bytesRead is less than expected, we may have to wait)
             while (bytesRead < lineWidth) {
                 delay(1);  // Wait a bit before attempting to read more bytes
-                bytesRead += stream->readBytes((char*)lineBuffer + bytesRead, lineWidth - bytesRead);
+                bytesRead += stream->readBytes((char*)bmpLine + bytesRead, lineWidth - bytesRead);
             }
 
+            for (int i = 240 * 3, j = 0; i > 0; i -= 3, j++) {
+              uint8_t b = bmpLine[i];
+              uint8_t g = bmpLine[i + 1];
+              uint8_t r = bmpLine[i + 2];
+              lineBuffer[j] = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+            }
+            // after taking the bmp line, then convert to the 16-bit array
             // Set the window for the current line
             tft.setAddrWindow(0, y, 239, y);
 
@@ -144,19 +150,15 @@ void loop() {
 
             totalBytesRead += bytesRead;
             y++;
-
-            // Delay a little before reading the next line, to slow things down
-            // delay(30); // Adjust delay to slow down the display process
         } else {
             Serial.println("Stream read failed or no more data!");
             break;
         }
     }
     
-    WiFi.disconnect();
-    // esp_deep_sleep_start();
-    delay(1000000);
-    ESP.restart();
+    // WiFi.disconnect();
+    delay(100000);
+    // ESP.restart();
     tft.endWrite(); // End batch rendering
   
   } else {
