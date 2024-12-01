@@ -11,12 +11,11 @@
 #include <HTTPClient.h>
 #include <NetworkClientSecure.h>
 
+#define potentiometerPin A0
+#define potentiometerPower 8
+
 // Server Name
 String serverName = "https://pixplay-540390702710.us-central1.run.app/bmp";
-
-// Update time for display set at 30min
-#define uS_TO_S_FACTOR 1000000  
-#define TIME_TO_SLEEP 600
 
 // for access point mode
 const char* ap_ssid = "PixPlay";
@@ -34,8 +33,7 @@ Preferences preferences;
 // WiFi server
 AsyncWebServer server(80);
 
-#define uS_TO_S_FACTOR 60000000  /* Conversion factor for micro seconds to minutes */
-#define TIME_TO_SLEEP  1 // minutes
+int currTime = millis();
 
 void setup() {
   Serial.begin(115200);
@@ -50,7 +48,7 @@ void setup() {
   WiFi.useStaticBuffers(true);
   WiFi.mode(WIFI_STA);
   WiFi.begin(wifi_ssid, wifi_pass);
-  int currTime = millis();
+  currTime = millis();
   while (WiFi.status() != WL_CONNECTED) { // Check WiFi status every 500ms. If after 7.5 attempts, no connection 
     delay(500);
     Serial.print(".");
@@ -92,6 +90,9 @@ void setup() {
   // Check in Cache if any WiFi settings already exist
   // If they already exist, attempt to connect. If connection successful, skip to loop. 
   // If connection is unsucessful, skip to next step.
+  // pinMode(potentiometerPin, INPUT);
+  pinMode(potentiometerPower, OUTPUT);
+  digitalWrite(potentiometerPower, HIGH);
   Serial.println();
   Serial.println("I'm connected to WiFi!");
 }
@@ -123,12 +124,9 @@ void loop() {
     tft.startWrite(); // Optimize for batch rendering
 
     // Read the image data line by line
-    while (totalBytesRead < contentLength && y < 320) {
-        // memset(lineBuffer, 0, sizeof(lineBuffer));
-        // Read one line of data
+    while (y < 319) {
         bytesRead = stream->readBytes((char*)bmpLine, lineWidth);
-
-        if (bytesRead > 0) {
+        if (bytesRead >= 0) {
             // Ensure that we read the full line (if bytesRead is less than expected, we may have to wait)
             while (bytesRead < lineWidth) {
                 delay(1);  // Wait a bit before attempting to read more bytes
@@ -147,25 +145,24 @@ void loop() {
 
             // Write the pixel data directly to the display
             tft.writePixels(lineBuffer, 240);
-
             totalBytesRead += bytesRead;
             y++;
         } else {
             Serial.println("Stream read failed or no more data!");
             break;
         }
+        delay(1);
     }
-    
-    // WiFi.disconnect();
-    delay(100000);
-    // ESP.restart();
+    // int currTime = millis();
+    // Change brightness depending on 
+    while(millis() - currTime < 1000000){ // 16.6 minutes of waiting till next image request
+      
+    }
     tft.endWrite(); // End batch rendering
+  } 
   
-  } else {
-    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-  }
-  Serial.println("no crash here");
-  
-  http.end();
+  // http.end();
+
+  delay(500);
 
 }

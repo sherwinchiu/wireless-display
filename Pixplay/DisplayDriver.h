@@ -21,7 +21,7 @@ void setupTFT(){
   Serial.println(F("Hello! ST77xx TFT Test"));
   
   pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH);
+  analogWrite(TFT_BL, 200);
 
   tft.init(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT);           // Init ST7789 320x240
   
